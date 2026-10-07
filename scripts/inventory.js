@@ -11,9 +11,24 @@
     throw new Error("Open chatgpt.com before running this inventory.");
   }
 
-  const scrollables = () => [...document.querySelectorAll("aside, nav, [role='navigation'], [data-sidebar] *")]
-    .filter((el) => el.scrollHeight > el.clientHeight + 80)
-    .sort((a, b) => b.clientHeight - a.clientHeight);
+  const conversationLinks = () => [...document.querySelectorAll("a[href*='/c/']")]
+    .filter((link) => text(link));
+
+  // The sidebar lazily fetches older conversations.  Its precise markup varies,
+  // so find the scrollable ancestor that contains the most conversation links
+  // instead of relying on a generated class name.
+  const conversationScroller = () => {
+    const scores = new Map();
+    for (const link of conversationLinks()) {
+      for (let node = link.parentElement; node && node !== document.body; node = node.parentElement) {
+        if (node.scrollHeight <= node.clientHeight + 80) continue;
+        const count = node.querySelectorAll("a[href*='/c/']").length;
+        scores.set(node, Math.max(scores.get(node) || 0, count));
+      }
+    }
+    return [...scores.entries()]
+      .sort((a, b) => (b[1] - a[1]) || (b[0].clientHeight - a[0].clientHeight))[0]?.[0] || null;
+  };
 
   const snapshot = () => {
     const links = [...document.querySelectorAll("a[href]")].map((a) => ({
@@ -53,23 +68,29 @@
 
   const run = async () => {
     const before = snapshot();
-    const panes = scrollables();
-    const seen = new Set();
+    const maxSteps = 800;
+    const quietStepsToFinish = 15;
+    let quietSteps = 0;
 
-    for (const pane of panes) {
-      let unchanged = 0;
-      for (let step = 0; step < 80 && unchanged < 4; step += 1) {
-        const marker = `${pane.scrollTop}:${pane.scrollHeight}`;
-        if (seen.has(`${step}:${marker}`)) break;
-        seen.add(`${step}:${marker}`);
-        const previousHeight = pane.scrollHeight;
-        const previousTop = pane.scrollTop;
-        pane.scrollBy({ top: Math.max(360, pane.clientHeight * 0.85), behavior: "instant" });
-        await sleep(180);
-        if (pane.scrollTop === previousTop && pane.scrollHeight === previousHeight) unchanged += 1;
-        else unchanged = 0;
+    for (let step = 0; step < maxSteps && quietSteps < quietStepsToFinish; step += 1) {
+      const pane = conversationScroller();
+      const beforeCount = snapshot().conversations.length;
+      const links = conversationLinks();
+      const last = links.at(-1);
+
+      // scrollIntoView is important: ChatGPT sometimes loads the next page
+      // only after the final rendered conversation itself becomes visible.
+      last?.scrollIntoView({ block: "end" });
+      pane?.scrollBy({ top: Math.max(480, pane.clientHeight * 0.9), behavior: "instant" });
+      await sleep(350);
+
+      const afterCount = snapshot().conversations.length;
+      const atBottom = !pane || pane.scrollTop + pane.clientHeight >= pane.scrollHeight - 2;
+      quietSteps = afterCount > beforeCount || !atBottom ? 0 : quietSteps + 1;
+
+      if ((step + 1) % 25 === 0) {
+        console.info(`Inventory progress: ${afterCount} conversations loaded after ${step + 1} scroll steps.`);
       }
-      pane.scrollTo({ top: 0, behavior: "instant" });
     }
 
     const after = snapshot();

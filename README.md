@@ -35,7 +35,7 @@ No API key, extension, package installation, or account credential is needed. Th
 4. Wait for `ChatGPT inventory complete`.
 5. Copy the JSON printed in the Console (the script also tries to copy it to your clipboard).
 
-The inventory only reports what ChatGPT has made available in the sidebar during its scan. If your account has many conversations, run it again after opening any collapsed sections or searching/scrolling to the relevant area.
+The inventory continuously scrolls the conversation list and waits for ChatGPT's lazy-loaded older entries. It stops only after 15 consecutive bottom-of-list checks add no new conversations (or after its safety cap of 800 scroll steps). For a very large history this can take several minutes; leave the tab and Console open until it prints `ChatGPT inventory complete`.
 
 ### Ask an assistant to classify it
 
