@@ -17,13 +17,25 @@
     await sleep(500);
   };
 
-  const findConversation = (name) => {
+  const findConversation = (move) => {
+    if (move.path || move.conversationId) {
+      const suffix = move.path || `/c/${move.conversationId}`;
+      const candidates = [...document.querySelectorAll("a[href*='/c/']")]
+        .filter((el) => visible(el) && new URL(el.href, location.href).pathname.endsWith(suffix));
+      if (candidates.length !== 1) {
+        throw new Error(candidates.length ? `Ambiguous conversation path: ${suffix}` : `Conversation path not visible: ${suffix}`);
+      }
+      return candidates[0];
+    }
+    const name = move.conversation;
     const candidates = exact([...document.querySelectorAll("a[href*='/c/']")], name);
     if (candidates.length !== 1) throw new Error(candidates.length ? `Ambiguous conversation title: ${name}` : `Conversation not visible: ${name}`);
     return candidates[0];
   };
 
   const findProjectChoice = (name) => {
+    const menuCandidates = exact([...document.querySelectorAll("[role='menuitem'], [role='option']")], name);
+    if (menuCandidates.length === 1) return menuCandidates[0];
     const candidates = exact([...document.querySelectorAll("[role='menuitem'], [role='option'], button, a")], name);
     if (candidates.length !== 1) throw new Error(candidates.length ? `Ambiguous Project choice: ${name}` : `Project choice not visible: ${name}`);
     return candidates[0];
@@ -41,8 +53,11 @@
       const entry = { ...move, status: "pending" };
       report.push(entry);
       try {
-        if (!move?.conversation || !move?.project) throw new Error("Each move needs conversation and project strings.");
-        const conversation = findConversation(move.conversation);
+        if (!move?.project || (!move?.conversation && !move?.conversationId && !move?.path)) {
+          throw new Error("Each move needs a project plus conversation, conversationId, or path.");
+        }
+        const conversation = findConversation(move);
+        const conversationLabel = move.conversation || normalise(conversation.innerText || conversation.textContent);
         if (DRY_RUN) {
           findProjectChoice(move.project); // verifies that it is currently exposed somewhere in the UI
           entry.status = "would move";
@@ -50,7 +65,7 @@
           continue;
         }
 
-        await click(moreButtonFor(conversation), `the action menu for “${move.conversation}”`);
+        await click(moreButtonFor(conversation), `the action menu for “${conversationLabel}”`);
         const moveCommand = exact([...document.querySelectorAll("[role='menuitem'], button")], "Move to project")[0]
           || [...document.querySelectorAll("[role='menuitem'], button")].find((el) => /move to project/i.test(normalise(el.innerText || el.textContent)));
         await click(moveCommand, "the “Move to project” command");

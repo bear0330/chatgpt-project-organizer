@@ -15,7 +15,7 @@ This keeps classification separate from account changes and makes the final move
 
 | File | Purpose | Changes your ChatGPT data? |
 | --- | --- | --- |
-| `scripts/inventory.js` | Scrolls the ChatGPT sidebar and exports the conversations and project-like links currently available in the UI. | No |
+| `scripts/inventory.js` | Scrolls the ChatGPT sidebar and exports the conversations and Projects currently available in the UI. | No |
 | `scripts/move-conversations.js` | Applies an explicit list of `conversation → project` moves through the ChatGPT UI. | Only when `DRY_RUN` is set to `false` |
 | `moves.example.js` | A small, editable move-plan template. | No, by itself |
 
@@ -56,7 +56,7 @@ const MOVES = [
 ];
 ```
 
-Use **exact, visible conversation and Project names**. If names are duplicated, rename one first or move it manually; the mover will refuse an ambiguous match.
+Use **exact, visible conversation and Project names**. For duplicated conversation titles, use the `conversationId` or the complete `path` from the inventory instead of `conversation`; see the commented examples in `moves.example.js`. This lets the mover select the intended conversation without renaming it.
 
 ## 3. Dry run, then execute
 

@@ -21,9 +21,33 @@
       href: new URL(a.href, location.href).pathname,
     })).filter((item) => item.title);
 
+    // Current ChatGPT sidebars render Project rows as buttons, not links.
+    // Their action button has a stable, human-readable label in both the
+    // Traditional-Chinese and English UIs, so derive the Project name from it.
+    const projectButtons = [...document.querySelectorAll("button[aria-label]")]
+      .map((button) => {
+        const label = button.getAttribute("aria-label") || "";
+        const title = label
+          .replace(/\s*(?:的專案動作|project actions?)\s*$/i, "")
+          .trim();
+        return { title, href: null, source: "sidebar-action" };
+      })
+      .filter((item) => item.title && item.title !== (item.href || ""))
+      .filter((item) => {
+        // Only retain labels which actually describe a project action.
+        return [...document.querySelectorAll("button[aria-label]")].some((button) => {
+          const label = button.getAttribute("aria-label") || "";
+          return /(?:的專案動作|project actions?)\s*$/i.test(label) &&
+            label.replace(/\s*(?:的專案動作|project actions?)\s*$/i, "").trim() === item.title;
+        });
+      });
+
     return {
       conversations: unique(links.filter((item) => isConversationHref(item.href)), (item) => `${item.href}|${item.title}`),
-      projects: unique(links.filter((item) => isProjectHref(item.href)), (item) => `${item.href}|${item.title}`),
+      projects: unique([
+        ...links.filter((item) => isProjectHref(item.href)),
+        ...projectButtons,
+      ], (item) => item.href ? `${item.href}|${item.title}` : item.title),
     };
   };
 
@@ -58,7 +82,7 @@
         "Use exact titles; ask for review of ambiguous classifications before moving.",
       ],
       conversations: unique([...before.conversations, ...after.conversations], (item) => `${item.href}|${item.title}`),
-      projects: unique([...before.projects, ...after.projects], (item) => `${item.href}|${item.title}`),
+      projects: unique([...before.projects, ...after.projects], (item) => item.href ? `${item.href}|${item.title}` : item.title),
     };
 
     const output = JSON.stringify(inventory, null, 2);
